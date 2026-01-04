@@ -2,18 +2,33 @@ export type PortId = string
 export type GraphEdgeId = string
 export type RegionId = string
 export type ConnectionId = string
+export type NetworkId = string
 
 export type RegionPort = {
   portId: PortId
   region1: Region
   region2: Region
   d: any
+  assignment?: RegionPortAssignment
+  /**
+   * The number of times this port has been ripped. Can be used to penalize
+   * ports that are likely to block off connections
+   */
+  ripCount?: number
 }
 
 export type Region = {
   regionId: RegionId
   ports: RegionPort[]
   d: any
+  assignments?: RegionPortAssignment[]
+}
+
+export type RegionPortAssignment = {
+  regionPort1: RegionPort
+  regionPort2: RegionPort
+  region: Region
+  connection: Connection
 }
 
 export type Candidate<
@@ -29,6 +44,7 @@ export type Candidate<
   lastPort?: RegionPortType
   lastRegion?: RegionType
   nextRegion?: RegionType
+  ripsRequired: number
 }
 
 export type HyperGraph = {
@@ -41,8 +57,14 @@ export type SerializedGraphPort = Omit<RegionPort, "edges"> & {
   region1Id: RegionId
   region2Id: RegionId
 }
-export type SerializedGraphRegion = Omit<Region, "points"> & {
+export type SerializedGraphRegion = Omit<Region, "points" | "assignments"> & {
   pointIds: PortId[]
+  assignments?: SerializedRegionPortAssignment[]
+}
+export type SerializedRegionPortAssignment = {
+  regionPort1Id: PortId
+  regionPort2Id: PortId
+  connectionId: ConnectionId
 }
 export type SerializedHyperGraph = {
   ports: SerializedGraphPort[]
@@ -51,6 +73,7 @@ export type SerializedHyperGraph = {
 
 export type Connection = {
   connectionId: ConnectionId
+  mutuallyConnectedNetworkId: NetworkId
   startRegion: Region
   endRegion: Region
 }
