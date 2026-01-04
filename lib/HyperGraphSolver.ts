@@ -20,7 +20,11 @@ export type SolvedRoute = {
   connection: Connection
 }
 
-export class HyperGraphSolver extends BaseSolver {
+export class HyperGraphSolver<
+  RegionType extends Region = Region,
+  RegionPortType extends RegionPort = RegionPort,
+  CandidateType extends Candidate = Candidate,
+> extends BaseSolver {
   graph: HyperGraph
   connections: Connection[]
 
@@ -34,6 +38,9 @@ export class HyperGraphSolver extends BaseSolver {
   currentEndRegion: Region | null = null
 
   greedyMultiplier = 1.0
+  rippingEnabled = false
+  ripCost = 0
+  randomRipFraction = 0
 
   lastCandidate: Candidate | null = null
 
@@ -44,6 +51,9 @@ export class HyperGraphSolver extends BaseSolver {
       inputGraph: HyperGraph | SerializedHyperGraph
       inputConnections: (Connection | SerializedConnection)[]
       greedyMultiplier?: number
+      rippingEnabled?: boolean
+      ripCost?: number
+      randomRipFraction?: number
     },
   ) {
     super()
@@ -67,11 +77,19 @@ export class HyperGraphSolver extends BaseSolver {
   }
 
   computeH(candidate: Candidate): number {
+    return this.estimateCostToEnd(candidate.port, this.currentEndRegion!)
+  }
+
+  estimateCostToEnd(port: RegionPortType, endRegion: RegionType): number {
+    return 0
+  }
+
+  computeRegionCostIfPortIsUsed(candidate: CandidateType): number {
     return 0
   }
 
   computeG(candidate: Candidate): number {
-    return 0
+    return candidate.parent!.g + this.computeRegionCostIfPortIsUsed(candidate)
   }
 
   selectCandidatesForRegion(candidates: Candidate[]): Candidate[] {
@@ -117,7 +135,13 @@ export class HyperGraphSolver extends BaseSolver {
   }
 
   override _step() {
-    const currentCandidate = this.candidateQueue.dequeue()
+    let currentCandidate = this.candidateQueue.dequeue()
+    while (
+      currentCandidate &&
+      this.visitedPointsForCurrentConnection.has(currentCandidate.port.portId)
+    ) {
+      currentCandidate = this.candidateQueue.dequeue()
+    }
     if (!currentCandidate) {
       this.failed = true
       this.error = "Ran out of candidates"
@@ -132,6 +156,11 @@ export class HyperGraphSolver extends BaseSolver {
 
     const nextCandidates = this.getNextCandidates(currentCandidate)
     for (const nextCandidate of nextCandidates) {
+      if (
+        this.visitedPointsForCurrentConnection.has(nextCandidate.port.portId)
+      ) {
+        continue
+      }
       this.candidateQueue.enqueue(nextCandidate)
     }
   }

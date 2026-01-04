@@ -16,16 +16,19 @@ export type Region = {
   d: any
 }
 
-export type Candidate = {
-  port: RegionPort
+export type Candidate<
+  RegionType extends Region = Region,
+  RegionPortType extends RegionPort = RegionPort,
+> = {
+  port: RegionPortType
   g: number
   h: number
   f: number
   hops: number
   parent?: Candidate
-  lastPort?: RegionPort
-  lastRegion?: Region
-  nextRegion?: Region
+  lastPort?: RegionPortType
+  lastRegion?: RegionType
+  nextRegion?: RegionType
 }
 
 export type HyperGraph = {
