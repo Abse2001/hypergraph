@@ -5,7 +5,9 @@
   "private": true,
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "react-cosmos": "^7.1.0",
+    "react-cosmos-plugin-vite": "^7.1.0"
   },
   "peerDependencies": {
     "typescript": "^5"
