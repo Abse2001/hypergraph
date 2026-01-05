@@ -2,15 +2,17 @@ import type { JPort, JRegion } from "../jumper-types"
 
 // 0606x2 resistor chip array dimensions
 // This is a 2-element array with 4 pads total (2 per resistor)
-// Layout is two resistors stacked vertically:
-//   [P1]--TJ1--[P2]   (top row)
-//   [P3]--TJ2--[P4]   (bottom row)
+// Layout is two resistors stacked vertically, each connecting left↔right:
+//   [P1] ----TJ1---- [P3]   (top row, Y = 0.40mm)
+//   [P2] ----TJ2---- [P4]   (bottom row, Y = -0.40mm)
+// Left pads at X = -0.725mm, Right pads at X = 0.725mm
 export const dims0606x2 = {
-  padLength: 0.8, // L direction (horizontal, along resistor)
-  padWidth: 0.45, // W direction (vertical)
-  pitch: 0.8, // center-to-center between pads horizontally (within one resistor)
-  rowPitch: 0.8, // center-to-center between rows vertically
-  outerSpan: 2.2, // outer edge to outer edge horizontally
+  padWidth: 0.8, // X direction (horizontal)
+  padHeight: 0.45, // Y direction (vertical)
+  leftPadCenterX: -0.725, // X position of left pads (P1, P2)
+  rightPadCenterX: 0.725, // X position of right pads (P3, P4)
+  topRowCenterY: 0.4, // Y position of top row (P1, P3)
+  bottomRowCenterY: -0.4, // Y position of bottom row (P2, P4)
 }
 
 export const generateSingleJumperX2Regions = ({
@@ -23,72 +25,67 @@ export const generateSingleJumperX2Regions = ({
   const regions: JRegion[] = []
   const ports: JPort[] = []
 
-  const { padLength, padWidth, pitch, rowPitch } = dims0606x2
+  const {
+    padWidth,
+    padHeight,
+    leftPadCenterX,
+    rightPadCenterX,
+    topRowCenterY,
+    bottomRowCenterY,
+  } = dims0606x2
 
-  const padHalfLength = padLength / 2
   const padHalfWidth = padWidth / 2
+  const padHalfHeight = padHeight / 2
 
-  // Horizontal pad centers (same for both rows)
-  const leftPadCenterX = center.x - pitch / 2
-  const rightPadCenterX = center.x + pitch / 2
+  // Absolute pad center positions
+  const p1CenterX = center.x + leftPadCenterX
+  const p1CenterY = center.y + topRowCenterY
 
-  // Vertical row centers
-  const topRowCenterY = center.y + rowPitch / 2
-  const bottomRowCenterY = center.y - rowPitch / 2
+  const p2CenterX = center.x + leftPadCenterX
+  const p2CenterY = center.y + bottomRowCenterY
+
+  const p3CenterX = center.x + rightPadCenterX
+  const p3CenterY = center.y + topRowCenterY
+
+  const p4CenterX = center.x + rightPadCenterX
+  const p4CenterY = center.y + bottomRowCenterY
 
   // Helper to create bounds for a pad at given center
   const createPadBounds = (padCenterX: number, padCenterY: number) => ({
-    minX: padCenterX - padHalfLength,
-    maxX: padCenterX + padHalfLength,
-    minY: padCenterY - padHalfWidth,
-    maxY: padCenterY + padHalfWidth,
+    minX: padCenterX - padHalfWidth,
+    maxX: padCenterX + padHalfWidth,
+    minY: padCenterY - padHalfHeight,
+    maxY: padCenterY + padHalfHeight,
   })
 
-  // Top row pads (P1 left, P2 right)
-  const pad1Bounds = createPadBounds(leftPadCenterX, topRowCenterY)
-  const pad2Bounds = createPadBounds(rightPadCenterX, topRowCenterY)
+  const pad1Bounds = createPadBounds(p1CenterX, p1CenterY)
+  const pad2Bounds = createPadBounds(p2CenterX, p2CenterY)
+  const pad3Bounds = createPadBounds(p3CenterX, p3CenterY)
+  const pad4Bounds = createPadBounds(p4CenterX, p4CenterY)
 
-  // Bottom row pads (P3 left, P4 right)
-  const pad3Bounds = createPadBounds(leftPadCenterX, bottomRowCenterY)
-  const pad4Bounds = createPadBounds(rightPadCenterX, bottomRowCenterY)
-
-  // Underjumper regions (between pads within each resistor row)
-  const underjumper1Bounds = {
+  // Underjumper region - single vertical region in the center between left and right pads
+  // NO ports connect this to pads
+  const underjumperBounds = {
     minX: pad1Bounds.maxX,
-    maxX: pad2Bounds.minX,
-    minY: topRowCenterY - padHalfWidth,
-    maxY: topRowCenterY + padHalfWidth,
-  }
-
-  const underjumper2Bounds = {
-    minX: pad3Bounds.maxX,
-    maxX: pad4Bounds.minX,
-    minY: bottomRowCenterY - padHalfWidth,
-    maxY: bottomRowCenterY + padHalfWidth,
-  }
-
-  // Gap region between the two rows (horizontally spanning the full width)
-  const centerGapBounds = {
-    minX: pad1Bounds.minX,
-    maxX: pad2Bounds.maxX,
-    minY: pad3Bounds.maxY,
-    maxY: pad1Bounds.minY,
+    maxX: pad3Bounds.minX,
+    minY: pad2Bounds.minY,
+    maxY: pad1Bounds.maxY,
   }
 
   // Throughjumper regions (conductive body of each resistor)
   const throughjumperHeight = 0.3
   const throughjumper1Bounds = {
-    minX: leftPadCenterX,
-    maxX: rightPadCenterX,
-    minY: topRowCenterY - throughjumperHeight / 2,
-    maxY: topRowCenterY + throughjumperHeight / 2,
+    minX: p1CenterX,
+    maxX: p3CenterX,
+    minY: p1CenterY - throughjumperHeight / 2,
+    maxY: p1CenterY + throughjumperHeight / 2,
   }
 
   const throughjumper2Bounds = {
-    minX: leftPadCenterX,
-    maxX: rightPadCenterX,
-    minY: bottomRowCenterY - throughjumperHeight / 2,
-    maxY: bottomRowCenterY + throughjumperHeight / 2,
+    minX: p2CenterX,
+    maxX: p4CenterX,
+    minY: p2CenterY - throughjumperHeight / 2,
+    maxY: p2CenterY + throughjumperHeight / 2,
   }
 
   // Surrounding region thickness
@@ -96,8 +93,8 @@ export const generateSingleJumperX2Regions = ({
 
   // The full extent of all main regions
   const mainMinX = pad1Bounds.minX
-  const mainMaxX = pad2Bounds.maxX
-  const mainMinY = pad3Bounds.minY // bottom row
+  const mainMaxX = pad3Bounds.maxX
+  const mainMinY = pad2Bounds.minY // bottom row
   const mainMaxY = pad1Bounds.maxY // top row
 
   // Helper to create a region
@@ -118,12 +115,8 @@ export const generateSingleJumperX2Regions = ({
   const pad3 = createRegion("pad3", pad3Bounds, true)
   const pad4 = createRegion("pad4", pad4Bounds, true)
 
-  // Create underjumper regions
-  const underjumper1 = createRegion("underjumper1", underjumper1Bounds, false)
-  const underjumper2 = createRegion("underjumper2", underjumper2Bounds, false)
-
-  // Create center gap region (between rows)
-  const centerGap = createRegion("centerGap", centerGapBounds, false)
+  // Create underjumper region (no ports to pads!)
+  const underjumper = createRegion("underjumper", underjumperBounds, false)
 
   // Create throughjumper regions
   const throughjumper1 = createRegion(
@@ -189,9 +182,7 @@ export const generateSingleJumperX2Regions = ({
     pad2,
     pad3,
     pad4,
-    underjumper1,
-    underjumper2,
-    centerGap,
+    underjumper,
     throughjumper1,
     throughjumper2,
     top,
@@ -246,71 +237,59 @@ export const generateSingleJumperX2Regions = ({
   ports.push(createPort("B-L", bottom, left))
   ports.push(createPort("B-R", bottom, right))
 
-  // Top row (P1, P2) - pad connections to surrounding regions
+  // Top row pads (P1 left, P3 right) - connections to surrounding regions
   ports.push(createPort("T-P1", top, pad1))
   ports.push(createPort("L-P1", left, pad1))
-  ports.push(createPort("T-P2", top, pad2))
-  ports.push(createPort("R-P2", right, pad2))
+  ports.push(createPort("T-P3", top, pad3))
+  ports.push(createPort("R-P3", right, pad3))
 
-  // Bottom row (P3, P4) - pad connections to surrounding regions
-  ports.push(createPort("B-P3", bottom, pad3))
-  ports.push(createPort("L-P3", left, pad3))
+  // Bottom row pads (P2 left, P4 right) - connections to surrounding regions
+  ports.push(createPort("B-P2", bottom, pad2))
+  ports.push(createPort("L-P2", left, pad2))
   ports.push(createPort("B-P4", bottom, pad4))
   ports.push(createPort("R-P4", right, pad4))
 
-  // Underjumper1 connections (left and right only - NO ports to pads)
-  ports.push(createPort("T-UJ1", top, underjumper1))
-
-  // Underjumper2 connections (left and right only - NO ports to pads)
-  ports.push(createPort("B-UJ2", bottom, underjumper2))
-
-  // Center gap connections to left and right
-  ports.push(createPort("L-CG", left, centerGap))
-  ports.push(createPort("R-CG", right, centerGap))
-
-  // Center gap connections to pads (between rows)
-  ports.push(createPort("CG-P1", centerGap, pad1))
-  ports.push(createPort("CG-P2", centerGap, pad2))
-  ports.push(createPort("CG-P3", centerGap, pad3))
-  ports.push(createPort("CG-P4", centerGap, pad4))
+  // Underjumper connections to top/bottom only - NO ports to pads!
+  ports.push(createPort("T-UJ", top, underjumper))
+  ports.push(createPort("B-UJ", bottom, underjumper))
 
   // Throughjumper1 connections (ports at the center of each pad in top row)
   const tj1LeftPort: JPort = {
     portId: `${idPrefix}:TJ1-P1`,
     region1: throughjumper1,
     region2: pad1,
-    d: { x: leftPadCenterX, y: topRowCenterY },
+    d: { x: p1CenterX, y: p1CenterY },
   }
   throughjumper1.ports.push(tj1LeftPort)
   pad1.ports.push(tj1LeftPort)
   ports.push(tj1LeftPort)
 
   const tj1RightPort: JPort = {
-    portId: `${idPrefix}:TJ1-P2`,
+    portId: `${idPrefix}:TJ1-P3`,
     region1: throughjumper1,
-    region2: pad2,
-    d: { x: rightPadCenterX, y: topRowCenterY },
+    region2: pad3,
+    d: { x: p3CenterX, y: p3CenterY },
   }
   throughjumper1.ports.push(tj1RightPort)
-  pad2.ports.push(tj1RightPort)
+  pad3.ports.push(tj1RightPort)
   ports.push(tj1RightPort)
 
   // Throughjumper2 connections (ports at the center of each pad in bottom row)
   const tj2LeftPort: JPort = {
-    portId: `${idPrefix}:TJ2-P3`,
+    portId: `${idPrefix}:TJ2-P2`,
     region1: throughjumper2,
-    region2: pad3,
-    d: { x: leftPadCenterX, y: bottomRowCenterY },
+    region2: pad2,
+    d: { x: p2CenterX, y: p2CenterY },
   }
   throughjumper2.ports.push(tj2LeftPort)
-  pad3.ports.push(tj2LeftPort)
+  pad2.ports.push(tj2LeftPort)
   ports.push(tj2LeftPort)
 
   const tj2RightPort: JPort = {
     portId: `${idPrefix}:TJ2-P4`,
     region1: throughjumper2,
     region2: pad4,
-    d: { x: rightPadCenterX, y: bottomRowCenterY },
+    d: { x: p4CenterX, y: p4CenterY },
   }
   throughjumper2.ports.push(tj2RightPort)
   pad4.ports.push(tj2RightPort)
