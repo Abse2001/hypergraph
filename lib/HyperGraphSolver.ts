@@ -296,7 +296,7 @@ export class HyperGraphSolver<
     while (true) {
       if (!currentCandidate) break
       // This candidate has not been visited yet, let's move to processing it
-      if (!visitedPointGScore) break
+      if (visitedPointGScore === undefined) break
       // If this candidate has a better g score than the visited point, let's move to processing it
       if (currentCandidate.g < visitedPointGScore) break
       currentCandidate = this.candidateQueue.dequeue() as CandidateType

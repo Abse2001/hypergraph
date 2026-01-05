@@ -23,9 +23,13 @@ export const visualizeJumperGraphSolver = (
 
   const graphics = visualizeJumperGraph(jumperGraph, {
     connections: solver.connections,
-    hideRegionPortLines: true,
-    hideConnectionLines: true,
-    hidePortPoints: true,
+    ...(solver.iterations > 0
+      ? {
+          hideRegionPortLines: true,
+          hideConnectionLines: true,
+          hidePortPoints: true,
+        }
+      : {}),
   }) as Required<GraphicsObject>
 
   // Draw active connection line

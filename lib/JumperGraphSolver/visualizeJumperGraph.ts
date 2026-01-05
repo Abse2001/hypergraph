@@ -20,6 +20,7 @@ export const visualizeJumperGraph = (
     lines: [],
     points: [],
     rects: [],
+    texts: [],
     coordinateSystem: "cartesian",
   } as Required<GraphicsObject>
 
@@ -39,7 +40,7 @@ export const visualizeJumperGraph = (
     } else if (isPad) {
       fill = "rgba(255, 200, 100, 0.5)" // orange for pads
     } else {
-      fill = "rgba(200, 200, 255, 0.3)" // blue for other regions
+      fill = "rgba(200, 200, 255, 0.1)" // blue for other regions
     }
 
     graphics.rects.push({
@@ -110,7 +111,7 @@ export const visualizeJumperGraph = (
       graphics.lines.push({
         points: [startCenter, endCenter],
         strokeColor: "rgba(255, 50, 150, 0.8)",
-        strokeDash: [10, 5],
+        strokeDash: "3 3",
       })
 
       graphics.points.push({
