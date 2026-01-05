@@ -1,5 +1,5 @@
 import { InteractiveGraphics } from "graphics-debug/react"
-import { generateSingleJumperRegions } from "lib/JumperGraphSolver/generator"
+import { generateSingleJumperRegions } from "lib/JumperGraphSolver/jumper-graph-generator/generateSingleJumperRegions"
 import { visualizeJumperGraph } from "lib/JumperGraphSolver/visualizeJumperGraph"
 
 const singleJumperTopology = generateSingleJumperRegions({

@@ -1,4 +1,4 @@
-import type { JPort, JRegion } from "./jumper-types"
+import type { JPort, JRegion } from "../jumper-types"
 
 export const dims0603 = {
   padToPad: 1.65,
