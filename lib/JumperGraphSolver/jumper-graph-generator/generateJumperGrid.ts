@@ -303,12 +303,23 @@ export const generateJumperGrid = ({
               top,
             ),
           )
+          // T-T connection between horizontally adjacent cells (first row only)
+          if (prevCell.top) {
+            ports.push(
+              createPort(
+                `cell_${row}_${col - 1}->cell_${row}_${col}:T-T`,
+                prevCell.top,
+                top,
+              ),
+            )
+          }
         }
-        if (bottom) {
+        // B-B connection between horizontally adjacent cells
+        if (bottom && prevCell.bottom) {
           ports.push(
             createPort(
-              `cell_${row}_${col - 1}->cell_${row}_${col}:R-B`,
-              prevCell.right!,
+              `cell_${row}_${col - 1}->cell_${row}_${col}:B-B`,
+              prevCell.bottom,
               bottom,
             ),
           )
