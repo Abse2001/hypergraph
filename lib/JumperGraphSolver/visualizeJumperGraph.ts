@@ -4,6 +4,9 @@ import type { JumperGraph } from "./jumper-types"
 
 export type JumperGraphVisualizationOptions = {
   connections?: Connection[]
+  hideRegionPortLines?: boolean
+  hideConnectionLines?: boolean
+  hidePortPoints?: boolean
 }
 
 export const visualizeJumperGraph = (
@@ -48,42 +51,45 @@ export const visualizeJumperGraph = (
   }
 
   // Draw ports as small circles with labels
-  for (const port of graph.ports) {
-    // Extract short region names (last part after colon)
-    const r1Name =
-      port.region1.regionId.split(":").pop() ?? port.region1.regionId
-    const r2Name =
-      port.region2.regionId.split(":").pop() ?? port.region2.regionId
+  if (!options?.hidePortPoints) {
+    for (const port of graph.ports) {
+      // Extract short region names (last part after colon)
+      const r1Name =
+        port.region1.regionId.split(":").pop() ?? port.region1.regionId
+      const r2Name =
+        port.region2.regionId.split(":").pop() ?? port.region2.regionId
 
-    graphics.circles.push({
-      center: { x: port.d.x, y: port.d.y },
-      radius: 0.05,
-      fill: "red",
-      stroke: "darkred",
-      label: `${r1Name}-${r2Name}`,
-    })
+      graphics.circles.push({
+        center: { x: port.d.x, y: port.d.y },
+        radius: 0.05,
+        fill: "rgba(128, 128, 128, 0.5)",
+        label: `${r1Name}-${r2Name}`,
+      })
+    }
   }
 
   // Draw lines connecting ports to show potential paths
-  for (const port of graph.ports) {
-    const r1Center = {
-      x: (port.region1.d.bounds.minX + port.region1.d.bounds.maxX) / 2,
-      y: (port.region1.d.bounds.minY + port.region1.d.bounds.maxY) / 2,
-    }
-    const r2Center = {
-      x: (port.region2.d.bounds.minX + port.region2.d.bounds.maxX) / 2,
-      y: (port.region2.d.bounds.minY + port.region2.d.bounds.maxY) / 2,
-    }
+  if (!options?.hideRegionPortLines) {
+    for (const port of graph.ports) {
+      const r1Center = {
+        x: (port.region1.d.bounds.minX + port.region1.d.bounds.maxX) / 2,
+        y: (port.region1.d.bounds.minY + port.region1.d.bounds.maxY) / 2,
+      }
+      const r2Center = {
+        x: (port.region2.d.bounds.minX + port.region2.d.bounds.maxX) / 2,
+        y: (port.region2.d.bounds.minY + port.region2.d.bounds.maxY) / 2,
+      }
 
-    // Draw line from region1 center through port to region2 center
-    graphics.lines.push({
-      points: [r1Center, { x: port.d.x, y: port.d.y }, r2Center],
-      strokeColor: "rgba(100, 100, 100, 0.3)",
-    })
+      // Draw line from region1 center through port to region2 center
+      graphics.lines.push({
+        points: [r1Center, { x: port.d.x, y: port.d.y }, r2Center],
+        strokeColor: "rgba(100, 100, 100, 0.3)",
+      })
+    }
   }
 
   // Draw connections if provided
-  if (options?.connections) {
+  if (options?.connections && !options?.hideConnectionLines) {
     for (const connection of options.connections) {
       const startRegion = connection.startRegion as { d: { bounds: any } }
       const endRegion = connection.endRegion as { d: { bounds: any } }

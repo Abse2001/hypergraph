@@ -1,14 +1,15 @@
+import type { GraphicsObject } from "graphics-debug"
 import { HyperGraphSolver } from "../HyperGraphSolver"
 import type {
   Connection,
   HyperGraph,
-  Region,
   RegionPort,
   SerializedConnection,
   SerializedHyperGraph,
   SolvedRoute,
 } from "../types"
 import type { JPort, JRegion } from "./jumper-types"
+import { visualizeJumperGraphSolver } from "./visualizeJumperGraphSolver"
 
 export class JumperGraphSolver extends HyperGraphSolver<JRegion, JPort> {
   UNIT_OF_COST = "distance"
@@ -35,4 +36,8 @@ export class JumperGraphSolver extends HyperGraphSolver<JRegion, JPort> {
   }
 
   override routeSolvedHook(solvedRoute: SolvedRoute) {}
+
+  override visualize(): GraphicsObject {
+    return visualizeJumperGraphSolver(this)
+  }
 }

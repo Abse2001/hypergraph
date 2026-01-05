@@ -59,6 +59,16 @@ export class PriorityQueue<T extends Node = Node> {
   }
 
   /**
+   * Returns up to N nodes with the highest priority (smallest 'f') without removing them.
+   * Nodes are returned sorted by priority (smallest 'f' first).
+   * @param count Maximum number of nodes to return.
+   * @returns Array of nodes sorted by priority.
+   */
+  peekMany(count: number): T[] {
+    return [...this.heap].sort((a, b) => a.f - b.f).slice(0, count)
+  }
+
+  /**
    * Removes and returns the node with the highest priority (smallest 'f').
    * Returns null if the queue is empty.
    * Maintains the heap property.

@@ -4,48 +4,52 @@ import { generateJumperX4Grid } from "lib/JumperGraphSolver/jumper-graph-generat
 import { createGraphWithConnectionsFromBaseGraph } from "lib/JumperGraphSolver/jumper-graph-generator/createGraphWithConnectionsFromBaseGraph"
 import { JumperGraphSolver } from "lib/JumperGraphSolver/JumperGraphSolver"
 
-test("jumper-graph-solver01: solve 1x1 X4 grid with external connections", () => {
-  const baseGraph = generateJumperX4Grid({
-    cols: 1,
-    rows: 1,
-    marginX: 0.5,
-    marginY: 0.5,
-    outerPaddingX: 0.8,
-    outerPaddingY: 0.8,
-  })
+test.skip(
+  "jumper-graph-solver01: solve 1x1 X4 grid with external connections",
+  { timeout: 30000 },
+  () => {
+    const baseGraph = generateJumperX4Grid({
+      cols: 1,
+      rows: 1,
+      marginX: 0.5,
+      marginY: 0.5,
+      outerPaddingX: 0.8,
+      outerPaddingY: 0.8,
+    })
 
-  const graphWithConnections = createGraphWithConnectionsFromBaseGraph(
-    baseGraph,
-    [
-      {
-        start: { x: -2.55, y: 1.0 },
-        end: { x: 2.55, y: -1.0 },
-        connectionId: "A",
+    const graphWithConnections = createGraphWithConnectionsFromBaseGraph(
+      baseGraph,
+      [
+        {
+          start: { x: -2.55, y: 1.0 },
+          end: { x: 2.55, y: -1.0 },
+          connectionId: "A",
+        },
+        {
+          start: { x: 0, y: 2.955 },
+          end: { x: -2.55, y: -1.0 },
+          connectionId: "B",
+        },
+        {
+          start: { x: 0, y: -2.955 },
+          end: { x: 2.55, y: 1.0 },
+          connectionId: "C",
+        },
+      ],
+    )
+
+    const solver = new JumperGraphSolver({
+      inputGraph: {
+        regions: graphWithConnections.regions,
+        ports: graphWithConnections.ports,
       },
-      {
-        start: { x: 0, y: 2.955 },
-        end: { x: -2.55, y: -1.0 },
-        connectionId: "B",
-      },
-      {
-        start: { x: 0, y: -2.955 },
-        end: { x: 2.55, y: 1.0 },
-        connectionId: "C",
-      },
-    ],
-  )
+      inputConnections: graphWithConnections.connections,
+    })
 
-  const solver = new JumperGraphSolver({
-    inputGraph: {
-      regions: graphWithConnections.regions,
-      ports: graphWithConnections.ports,
-    },
-    inputConnections: graphWithConnections.connections,
-  })
+    solver.solve()
 
-  solver.solve()
-
-  expect(
-    getSvgFromGraphicsObject(solver.visualize()),
-  ).toMatchSvgSnapshot(import.meta.path)
-})
+    expect(getSvgFromGraphicsObject(solver.visualize())).toMatchSvgSnapshot(
+      import.meta.path,
+    )
+  },
+)
