@@ -15,6 +15,7 @@ test.skip(
       marginY: 0.5,
       outerPaddingX: 0.8,
       outerPaddingY: 0.8,
+      regionsBetweenPads: true,
     })
 
     const graphWithConnections = createGraphWithConnectionsFromBaseGraph(

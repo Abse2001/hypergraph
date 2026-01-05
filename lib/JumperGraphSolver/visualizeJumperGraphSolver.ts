@@ -4,6 +4,15 @@ import type { JPort, JRegion, JumperGraph } from "./jumper-types"
 import { visualizeJumperGraph } from "./visualizeJumperGraph"
 import type { JumperGraphSolver } from "./JumperGraphSolver"
 
+const getConnectionColor = (connectionId: string, alpha = 0.8): string => {
+  let hash = 0
+  for (let i = 0; i < connectionId.length; i++) {
+    hash = connectionId.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue = Math.abs(hash) % 360
+  return `hsla(${hue}, 70%, 50%, ${alpha})`
+}
+
 export const visualizeJumperGraphSolver = (
   solver: JumperGraphSolver,
 ): GraphicsObject => {
@@ -21,6 +30,7 @@ export const visualizeJumperGraphSolver = (
 
   // Draw active connection line
   if (solver.currentConnection) {
+    const connectionColor = getConnectionColor(solver.currentConnection.connectionId)
     const startRegion = solver.currentConnection.startRegion as JRegion
     const endRegion = solver.currentConnection.endRegion as JRegion
 
@@ -33,25 +43,28 @@ export const visualizeJumperGraphSolver = (
       y: (endRegion.d.bounds.minY + endRegion.d.bounds.maxY) / 2,
     }
 
-    const midX = (startCenter.x + endCenter.x) / 2
-    const midY = (startCenter.y + endCenter.y) / 2
-
     graphics.lines.push({
       points: [startCenter, endCenter],
-      strokeColor: "rgba(255, 50, 150, 0.8)",
+      strokeColor: connectionColor,
       strokeDash: [10, 5],
     })
 
     graphics.points.push({
-      x: midX,
-      y: midY,
-      color: "rgba(200, 0, 100, 1)",
-      label: solver.currentConnection.connectionId,
+      x: startCenter.x,
+      y: startCenter.y,
+      color: connectionColor,
+    })
+
+    graphics.points.push({
+      x: endCenter.x,
+      y: endCenter.y,
+      color: connectionColor,
     })
   }
 
   // Draw solved routes
   for (const solvedRoute of solver.solvedRoutes) {
+    const connectionColor = getConnectionColor(solvedRoute.connection.connectionId)
     const pathPoints: { x: number; y: number }[] = []
 
     for (const candidate of solvedRoute.path) {
@@ -62,7 +75,7 @@ export const visualizeJumperGraphSolver = (
     if (pathPoints.length > 0) {
       graphics.lines.push({
         points: pathPoints,
-        strokeColor: "rgba(0, 200, 0, 0.8)",
+        strokeColor: connectionColor,
       })
     }
   }
@@ -87,10 +100,12 @@ export const visualizeJumperGraphSolver = (
     })
   }
 
-  // Draw current path being explored (from lastCandidate back to start)
-  if (solver.lastCandidate) {
+  // Draw path of next candidate to be processed
+  const nextCandidate = candidates[0] as Candidate<JRegion, JPort> | undefined
+  if (nextCandidate && solver.currentConnection) {
+    const connectionColor = getConnectionColor(solver.currentConnection.connectionId)
     const activePath: { x: number; y: number }[] = []
-    let cursor: Candidate | undefined = solver.lastCandidate
+    let cursor: Candidate | undefined = nextCandidate
 
     while (cursor) {
       const port = cursor.port as JPort
@@ -101,7 +116,7 @@ export const visualizeJumperGraphSolver = (
     if (activePath.length > 1) {
       graphics.lines.push({
         points: activePath,
-        strokeColor: "rgba(255, 165, 0, 0.8)",
+        strokeColor: connectionColor,
         strokeDash: [5, 3],
       })
     }
