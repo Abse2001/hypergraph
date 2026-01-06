@@ -2,10 +2,10 @@ import { generateJumperX4Grid } from "../lib/JumperGraphSolver/jumper-graph-gene
 import { createProblemFromBaseGraph } from "../lib/JumperGraphSolver/jumper-graph-generator/createProblemFromBaseGraph"
 import { JumperGraphSolver } from "../lib/JumperGraphSolver/JumperGraphSolver"
 
-const SAMPLES_PER_EPOCH = 100
+const SAMPLES_PER_EPOCH = 500
 const NUM_EPOCHS = 50
 const LEARNING_RATE = 0.5
-const EPSILON = 0.1 // For finite difference gradient approximation
+const EPSILON = 0.02 // For finite difference gradient approximation
 const MIN_CROSSINGS = 2
 const MAX_CROSSINGS = 12
 
@@ -212,12 +212,12 @@ async function main() {
 
   // Initial parameters (current defaults)
   let params: Parameters = {
-    portUsagePenalty: 1,
-    portUsagePenaltySq: 0,
+    portUsagePenalty: 0.3,
+    portUsagePenaltySq: 0.1,
     crossingPenalty: 6,
-    crossingPenaltySq: 0,
+    crossingPenaltySq: 0.1,
     ripCost: 40,
-    greedyMultiplier: 1.2,
+    greedyMultiplier: 0.45,
   }
 
   console.log("Initial parameters:")
