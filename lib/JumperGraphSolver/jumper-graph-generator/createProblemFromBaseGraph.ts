@@ -6,6 +6,7 @@ import {
   type JumperGraphWithConnections,
   type XYConnection,
 } from "./createGraphWithConnectionsFromBaseGraph"
+import { distance } from "@tscircuit/math-utils"
 
 /**
  * Simple seeded random number generator (Linear Congruential Generator)
@@ -45,18 +46,6 @@ const countCrossings = (
 }
 
 const MIN_POINT_DISTANCE = 0.4
-
-/**
- * Calculates the distance between two points.
- */
-const distance = (
-  p1: { x: number; y: number },
-  p2: { x: number; y: number },
-): number => {
-  const dx = p1.x - p2.x
-  const dy = p1.y - p2.y
-  return Math.sqrt(dx * dx + dy * dy)
-}
 
 /**
  * Checks if a point is at least MIN_POINT_DISTANCE away from all existing points.
@@ -190,6 +179,12 @@ export const createProblemFromBaseGraph = ({
 
     if (actualCrossings === numCrossings) {
       return createGraphWithConnectionsFromBaseGraph(baseGraph, xyConnections)
+    }
+
+    // If we exceed the number of crossings, start over
+    if (actualCrossings > numCrossings) {
+      attempts++
+      continue
     }
 
     attempts++
