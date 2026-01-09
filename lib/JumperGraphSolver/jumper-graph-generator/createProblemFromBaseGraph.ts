@@ -128,7 +128,11 @@ const getRandomPerimeterPoint = (
     }
 
     // Fallback to last side (shouldn't happen due to floating point)
-    return getPointOnSide(bounds, allowedSides[allowedSides.length - 1], random())
+    return getPointOnSide(
+      bounds,
+      allowedSides[allowedSides.length - 1],
+      random(),
+    )
   }
 
   const perimeter = 2 * width + 2 * height
@@ -215,7 +219,11 @@ export const createProblemFromBaseGraph = ({
       // Try to find a valid start point
       let start: { x: number; y: number } | null = null
       for (let tryCount = 0; tryCount < 100; tryCount++) {
-        const candidate = getRandomPerimeterPoint(graphBounds, random, allowedSides)
+        const candidate = getRandomPerimeterPoint(
+          graphBounds,
+          random,
+          allowedSides,
+        )
         if (isValidPoint(candidate, allPoints)) {
           start = candidate
           break
@@ -230,7 +238,11 @@ export const createProblemFromBaseGraph = ({
       // Try to find a valid end point
       let end: { x: number; y: number } | null = null
       for (let tryCount = 0; tryCount < 100; tryCount++) {
-        const candidate = getRandomPerimeterPoint(graphBounds, random, allowedSides)
+        const candidate = getRandomPerimeterPoint(
+          graphBounds,
+          random,
+          allowedSides,
+        )
         if (isValidPoint(candidate, allPoints)) {
           end = candidate
           break

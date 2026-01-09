@@ -55,7 +55,9 @@ console.log(
   `Graph size (horizontal): ${hWidth.toFixed(1)}x${hHeight.toFixed(1)}mm`,
 )
 
-console.log("Benchmark: 4x4 1206x4 Jumper Grid Solver (Two-Sided Points, Both Orientations)")
+console.log(
+  "Benchmark: 4x4 1206x4 Jumper Grid Solver (Two-Sided Points, Both Orientations)",
+)
 console.log("=".repeat(50))
 console.log(
   `Testing ${MIN_CROSSINGS}-${MAX_CROSSINGS} connections with ${SAMPLES_PER_CROSSING_COUNT} samples each\n`,
