@@ -8,7 +8,8 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "build:site": "cosmos-export",
-    "build": "tsup ./lib/index.ts --dts --format esm"
+    "build": "tsup ./lib/index.ts --dts --format esm",
+    "parse:kicad:vias": "bun scripts/parse-kicad-pcb-vias.ts"
   },
   "files": [
     "dist"
