@@ -4,8 +4,10 @@ import { JumperGraphSolver } from "lib/JumperGraphSolver/JumperGraphSolver"
 import { createGraphWithConnectionsFromBaseGraph } from "lib/JumperGraphSolver/jumper-graph-generator/createGraphWithConnectionsFromBaseGraph"
 import { generateJumperX4Grid } from "lib/JumperGraphSolver/jumper-graph-generator/generateJumperX4Grid"
 
-test("jumper-graph-solver02: solve 1x1 X4 grid with 5 external connections", // @ts-expect-error bun:test types don't include timeout option
-{ timeout: 30000 }, () => {
+test("jumper-graph-solver02: solve 1x1 X4 grid with 5 external connections", {
+  // @ts-expect-error bun:test types don't include timeout option
+  timeout: 30000,
+}, () => {
   const baseGraph = generateJumperX4Grid({
     cols: 1,
     rows: 1,
