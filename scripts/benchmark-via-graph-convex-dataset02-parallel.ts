@@ -36,7 +36,7 @@ Options:
   --limit=N         Only run first N samples (default: all 1000)
   --concurrency=N   Number of parallel workers (default: CPU count = ${cpus().length})
   --quick           Use reduced MAX_ITERATIONS for faster but less accurate results
-  [via-json-file]   Optional via JSON file path (default: assets/ViaGraphSolver/via-tile.json)
+  [via-json-file]   Optional via JSON file path (default: auto-recommended per sample)
   --help, -h        Show this help message
 
 Examples:
@@ -81,6 +81,7 @@ type BenchmarkResult = {
   rows: number
   cols: number
   orientation: "vertical" | "horizontal"
+  selectedViaRegionName: string
   solved: boolean
   failed: boolean
   iterations: number
@@ -114,9 +115,13 @@ const mean = (numbers: number[]): number | undefined => {
 // Worker code as a string that uses the built dist/index.js
 const workerCode = `
 const { parentPort, workerData } = require('worker_threads');
-const { ViaGraphSolver, createConvexViaGraphFromXYConnections } = require(workerData.distPath);
+const {
+  ViaGraphSolver,
+  createConvexViaGraphFromXYConnections,
+  recommendViaTileFromGraphInput,
+} = require(workerData.distPath);
 
-const { sample, sampleIndex, viaTile, quickMode } = workerData;
+const { sample, sampleIndex, viaTile, viaRegionName, quickMode } = workerData;
 
 function extractXYConnections(sample) {
   const regionMap = new Map(
@@ -144,7 +149,13 @@ function extractXYConnections(sample) {
 function solveSample() {
   try {
     const xyConnections = extractXYConnections(sample);
-    const result = createConvexViaGraphFromXYConnections(xyConnections, viaTile);
+    const problemInput = { sample };
+    const selectedViaRegionName = viaTile
+      ? viaRegionName
+      : recommendViaTileFromGraphInput(problemInput, xyConnections).recommendedViaRegionName;
+    const result = viaTile
+      ? createConvexViaGraphFromXYConnections(xyConnections, viaTile)
+      : createConvexViaGraphFromXYConnections(xyConnections, problemInput);
 
     // Count region types
     const convexRegions = result.regions.filter(r => r.regionId.startsWith('convex:')).length;
@@ -176,6 +187,7 @@ function solveSample() {
       rows: sample.config.rows,
       cols: sample.config.cols,
       orientation: sample.config.orientation,
+      selectedViaRegionName,
       solved: solver.solved,
       failed: solver.failed,
       iterations: solver.iterations,
@@ -193,6 +205,7 @@ function solveSample() {
       rows: sample.config.rows,
       cols: sample.config.cols,
       orientation: sample.config.orientation,
+      selectedViaRegionName: viaRegionName || "auto-select-per-sample",
       solved: false,
       failed: true,
       iterations: 0,
@@ -216,7 +229,8 @@ parentPort.postMessage(result);
 function runSampleInWorker(
   sampleIndex: number,
   sample: DatasetSample,
-  viaTile: ViaTile,
+  viaTile: ViaTile | undefined,
+  viaRegionName: string,
   quickMode: boolean,
   distPath: string,
 ): Promise<BenchmarkResult> {
@@ -227,6 +241,7 @@ function runSampleInWorker(
         sample,
         sampleIndex,
         viaTile,
+        viaRegionName,
         quickMode,
         distPath,
       },
@@ -244,6 +259,7 @@ function runSampleInWorker(
         rows: sample.config.rows,
         cols: sample.config.cols,
         orientation: sample.config.orientation,
+        selectedViaRegionName: viaRegionName,
         solved: false,
         failed: true,
         iterations: 0,
@@ -265,6 +281,7 @@ function runSampleInWorker(
           rows: sample.config.rows,
           cols: sample.config.cols,
           orientation: sample.config.orientation,
+          selectedViaRegionName: viaRegionName,
           solved: false,
           failed: true,
           iterations: 0,
@@ -285,7 +302,8 @@ function runSampleInWorker(
  */
 async function runParallelBenchmark(
   samples: DatasetSample[],
-  viaTile: ViaTile,
+  viaTile: ViaTile | undefined,
+  viaRegionName: string,
   concurrency: number,
   quickMode: boolean,
   distPath: string,
@@ -304,6 +322,7 @@ async function runParallelBenchmark(
         currentIndex,
         sample,
         viaTile,
+        viaRegionName,
         quickMode,
         distPath,
       )
@@ -334,21 +353,22 @@ const dataset: DatasetSample[] = JSON.parse(
   fs.readFileSync(datasetPath, "utf8"),
 )
 
-// Load vias-by-net
-const defaultViaTilePath = path.join(
-  __dirname,
-  "../assets/ViaGraphSolver/via-tile-4-regions.json",
-)
+// Optional via tile override. If omitted, generator auto-selects per sample.
 const viaTilePath = viaTileArg
   ? path.isAbsolute(viaTileArg)
     ? viaTileArg
     : path.resolve(process.cwd(), viaTileArg)
-  : defaultViaTilePath
-if (!fs.existsSync(viaTilePath)) {
+  : undefined
+if (viaTilePath && !fs.existsSync(viaTilePath)) {
   console.error(`Error: via JSON file not found: ${viaTilePath}`)
   process.exit(1)
 }
-const viaTile: ViaTile = JSON.parse(fs.readFileSync(viaTilePath, "utf8"))
+const viaTile: ViaTile | undefined = viaTilePath
+  ? JSON.parse(fs.readFileSync(viaTilePath, "utf8"))
+  : undefined
+const viaRegionName = viaTilePath
+  ? path.basename(viaTilePath, path.extname(viaTilePath))
+  : "auto-select-per-sample"
 
 // Path to built dist
 const distPath = path.join(__dirname, "../dist/index.js")
@@ -370,7 +390,11 @@ console.log(
 )
 console.log("=".repeat(70))
 console.log(`Loaded ${dataset.length} samples from dataset02`)
-console.log(`Via topology loaded from ${viaTilePath}`)
+if (viaTilePath) {
+  console.log(`Via topology loaded from ${viaTilePath}`)
+} else {
+  console.log("Via topology: auto-recommended per sample")
+}
 console.log(`Concurrency: ${CONCURRENCY} workers`)
 if (SAMPLE_LIMIT) {
   console.log(`Sample limit: ${SAMPLE_LIMIT}`)
@@ -404,6 +428,7 @@ const printProgress = (completed: number, results: BenchmarkResult[]) => {
 runParallelBenchmark(
   samplesToRun,
   viaTile,
+  viaRegionName,
   CONCURRENCY,
   QUICK_MODE,
   distPath,
