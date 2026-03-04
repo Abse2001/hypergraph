@@ -1,16 +1,34 @@
-import defaultViaTile from "assets/ViaGraphSolver/via-tile-4-regions.json"
 import type { XYConnection } from "../../JumperGraphSolver/jumper-graph-generator/createGraphWithConnectionsFromBaseGraph"
 import type { JumperGraph } from "../../JumperGraphSolver/jumper-types"
 import type { Connection } from "../../types"
 import type { ViaTile } from "../ViaGraphSolver"
 import { createViaGraphWithConnections } from "./createViaGraphWithConnections"
 import { generateConvexViaTopologyRegions } from "./generateConvexViaTopologyRegions"
+import {
+  selectViaTileForProblemInput,
+  type ViaTileRecommendationProblemInput,
+} from "./recommendViaTileFromGraphInput"
+
+export {
+  recommendViaTileFromGraphInput,
+  type ViaTileRecommendation,
+  type ViaTileRecommendationCandidate,
+  type ViaTileRecommendationProblemInput,
+} from "./recommendViaTileFromGraphInput"
 
 export type ConvexViaGraphFromXYConnectionsResult = JumperGraph & {
   connections: Connection[]
   viaTile: ViaTile
   tileCount: { rows: number; cols: number }
 }
+
+const isViaTile = (input: unknown): input is ViaTile =>
+  Boolean(
+    input &&
+      typeof input === "object" &&
+      "viasByNet" in input &&
+      "routeSegments" in input,
+  )
 
 /**
  * Calculate the bounds from XY connections with no margin.
@@ -55,12 +73,12 @@ function calculateBoundsFromConnections(xyConnections: XYConnection[]): {
  * 5. Attaches connection regions to the graph
  *
  * @param xyConnections - Array of connections with start/end XY coordinates
- * @param viaTile - Via tile data (defaults to built-in via-tile.json)
+ * @param viaTileOrProblem - Optional explicit via tile, or one-problem input used to recommend a tile
  * @param opts - Optional configuration
  */
 export function createConvexViaGraphFromXYConnections(
   xyConnections: XYConnection[],
-  viaTile: ViaTile = defaultViaTile as ViaTile,
+  viaTileOrProblem?: ViaTile | ViaTileRecommendationProblemInput,
   opts?: {
     tileWidth?: number
     tileHeight?: number
@@ -70,6 +88,16 @@ export function createConvexViaGraphFromXYConnections(
     concavityTolerance?: number
   },
 ): ConvexViaGraphFromXYConnectionsResult {
+  const selectedViaTile = isViaTile(viaTileOrProblem)
+    ? viaTileOrProblem
+    : selectViaTileForProblemInput(
+        {
+          ...(viaTileOrProblem ?? {}),
+          xyConnections: viaTileOrProblem?.xyConnections ?? xyConnections,
+        },
+        xyConnections,
+      )
+
   // Calculate bounds from connections (no margin)
   const bounds = calculateBoundsFromConnections(xyConnections)
 
@@ -81,10 +109,10 @@ export function createConvexViaGraphFromXYConnections(
     viaTile: generatedViaTile,
     tileCount,
   } = generateConvexViaTopologyRegions({
-    viaTile,
+    viaTile: selectedViaTile,
     bounds,
-    tileWidth: opts?.tileWidth ?? viaTile.tileWidth,
-    tileHeight: opts?.tileHeight ?? viaTile.tileHeight,
+    tileWidth: opts?.tileWidth ?? selectedViaTile.tileWidth,
+    tileHeight: opts?.tileHeight ?? selectedViaTile.tileHeight,
     tileSize: opts?.tileSize,
     portPitch: opts?.portPitch,
     clearance: opts?.clearance,
