@@ -1,7 +1,7 @@
-import viaTile3Regions from "assets/ViaGraphSolver/via-tile-3-regions.json"
-import defaultViaTile from "assets/ViaGraphSolver/via-tile-4-regions.json"
-import viaTile5Regions from "assets/ViaGraphSolver/via-tile-5-regions.json"
-import viaTile6Regions from "assets/ViaGraphSolver/via-tile-6-regions.json"
+import viaTile3Regions from "assets/ViaGraphSolver/via-tile-3-regions-baked.json"
+import defaultViaTile from "assets/ViaGraphSolver/via-tile-4-regions-baked.json"
+import viaTile5Regions from "assets/ViaGraphSolver/via-tile-5-regions-baked.json"
+import viaTile6Regions from "assets/ViaGraphSolver/via-tile-6-regions-baked.json"
 import type { XYConnection } from "../../JumperGraphSolver/jumper-graph-generator/createGraphWithConnectionsFromBaseGraph"
 import type { ViaTile } from "../ViaGraphSolver"
 

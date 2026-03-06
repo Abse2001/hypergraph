@@ -27,6 +27,7 @@ type Bounds = { minX: number; maxX: number; minY: number; maxY: number }
 interface UnitTileTemplate {
   /** Via regions within the tile (centered at origin) */
   viaRegions: Array<{
+    templateRegionId: string
     netName: string
     polygon: Point[]
     bounds: Bounds
@@ -34,6 +35,7 @@ interface UnitTileTemplate {
   }>
   /** Convex regions computed by ConvexRegionsSolver (centered at origin) */
   convexRegions: Array<{
+    templateRegionId: string
     polygon: Point[]
     bounds: Bounds
     center: Point
@@ -41,6 +43,19 @@ interface UnitTileTemplate {
   /** Tile dimensions */
   tileWidth: number
   tileHeight: number
+}
+
+type BakedViaTileRegion = {
+  regionId: string
+  polygon: Point[]
+  bounds: Bounds
+  center: Point
+  isViaRegion: boolean
+  netName?: string
+}
+
+type BakedViaTile = ViaTile & {
+  regions: BakedViaTileRegion[]
 }
 
 type HorizontalSegment = { xStart: number; xEnd: number; y: number }
@@ -229,6 +244,26 @@ function translateRouteSegments(
       y: point.y + dy,
     })),
   }))
+}
+
+function isBakedViaTile(viaTile: ViaTile): viaTile is BakedViaTile {
+  return (
+    "regions" in viaTile &&
+    Array.isArray((viaTile as { regions?: unknown }).regions)
+  )
+}
+
+function extractViaNetNameFromRegionId(regionId: string): string | null {
+  const marker = ":v:"
+  const markerIndex = regionId.lastIndexOf(marker)
+  if (markerIndex === -1) return null
+  return regionId.slice(markerIndex + marker.length)
+}
+
+function replaceTilePrefix(templateRegionId: string, prefix: string): string {
+  const colonIndex = templateRegionId.indexOf(":")
+  if (colonIndex === -1) return `${prefix}:${templateRegionId}`
+  return `${prefix}${templateRegionId.slice(colonIndex)}`
 }
 
 /**
@@ -457,6 +492,7 @@ function computeUnitTileTemplate(
     if (polygon.length === 0) continue
 
     viaRegions.push({
+      templateRegionId: `t0_0:v:${netName}`,
       netName,
       polygon,
       bounds: boundsFromPolygon(polygon),
@@ -486,10 +522,50 @@ function computeUnitTileTemplate(
 
   // Convert solver output to template format
   const convexRegions: UnitTileTemplate["convexRegions"] =
-    solverOutput.regions.map((polygon: Point[]) => ({
+    solverOutput.regions.map((polygon: Point[], index: number) => ({
+      templateRegionId: `t0_0:convex:${index}`,
       polygon,
       bounds: boundsFromPolygon(polygon),
       center: centroid(polygon),
+    }))
+
+  return {
+    viaRegions,
+    convexRegions,
+    tileWidth,
+    tileHeight,
+  }
+}
+
+function computeUnitTileTemplateFromBakedViaTile(
+  viaTile: BakedViaTile,
+  tileWidth: number,
+  tileHeight: number,
+): UnitTileTemplate {
+  const insideRegions = viaTile.regions.filter(
+    (region) => region.polygon.length >= 3,
+  )
+
+  const viaRegions = insideRegions
+    .filter((region) => region.isViaRegion)
+    .map((region) => ({
+      templateRegionId: region.regionId,
+      netName:
+        region.netName ??
+        extractViaNetNameFromRegionId(region.regionId) ??
+        "unknown",
+      polygon: region.polygon,
+      bounds: region.bounds,
+      center: region.center,
+    }))
+
+  const convexRegions = insideRegions
+    .filter((region) => !region.isViaRegion)
+    .map((region) => ({
+      templateRegionId: region.regionId,
+      polygon: region.polygon,
+      bounds: region.bounds,
+      center: region.center,
     }))
 
   return {
@@ -598,13 +674,19 @@ export function generateConvexViaTopologyRegions(opts: {
   // Step 1: Compute unit tile template (only once)
   let unitTileTemplate: UnitTileTemplate | null = null
   if (rows > 0 && cols > 0) {
-    unitTileTemplate = computeUnitTileTemplate(
-      inputViaTile,
-      tileWidth,
-      tileHeight,
-      clearance,
-      concavityTolerance,
-    )
+    unitTileTemplate = isBakedViaTile(inputViaTile)
+      ? computeUnitTileTemplateFromBakedViaTile(
+          inputViaTile,
+          tileWidth,
+          tileHeight,
+        )
+      : computeUnitTileTemplate(
+          inputViaTile,
+          tileWidth,
+          tileHeight,
+          clearance,
+          concavityTolerance,
+        )
   }
 
   // Step 2: Replicate tiles across the grid
@@ -623,8 +705,12 @@ export function generateConvexViaTopologyRegions(opts: {
             tileCenterY,
           )
 
+          const viaRegionId = replaceTilePrefix(
+            templateViaRegion.templateRegionId,
+            prefix,
+          )
           const viaRegion = createRegionFromPolygon(
-            `${prefix}:v:${templateViaRegion.netName}`,
+            viaRegionId,
             translatedPolygon,
             { isViaRegion: true },
           )
@@ -633,16 +719,19 @@ export function generateConvexViaTopologyRegions(opts: {
         }
 
         // Create convex regions for this tile (translated from template)
-        for (let i = 0; i < unitTileTemplate.convexRegions.length; i++) {
-          const templateConvexRegion = unitTileTemplate.convexRegions[i]
+        for (const templateConvexRegion of unitTileTemplate.convexRegions) {
           const translatedPolygon = translatePolygon(
             templateConvexRegion.polygon,
             tileCenterX,
             tileCenterY,
           )
 
+          const convexRegionId = replaceTilePrefix(
+            templateConvexRegion.templateRegionId,
+            prefix,
+          )
           const convexRegion = createRegionFromPolygon(
-            `${prefix}:convex:${i}`,
+            convexRegionId,
             translatedPolygon,
           )
           convexRegions.push(convexRegion)
@@ -824,7 +913,7 @@ export function generateConvexViaTopologyRegions(opts: {
   }
 
   // Step 4: Create ports between convex regions within each tile
-  // Since all tiles use the same template, we need to create ports within each tile
+  // Runtime shared-edge port generation is always used for solver reliability.
   if (unitTileTemplate && rows > 0 && cols > 0) {
     const regionsPerTile = unitTileTemplate.convexRegions.length
 
