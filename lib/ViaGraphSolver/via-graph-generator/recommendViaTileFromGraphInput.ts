@@ -149,38 +149,30 @@ const extractXYConnectionsFromSample = (
   return xyConnections
 }
 
-const predictViaRegionFromGraphPattern = (input: {
+const predictViaRegionFromSolveMatrix = (input: {
   graphWidthMm: number
   graphHeightMm: number
   connectionCount: number
   intersectionCount: number
-}): string | null => {
-  const area = Math.max(input.graphWidthMm * input.graphHeightMm, 0.01)
-  const density = input.connectionCount / area
+}): string => {
+  const area = input.graphWidthMm * input.graphHeightMm
 
-  if (density <= 0.032343248633284985) {
-    if (input.connectionCount <= 11.5) {
-      // Narrow exception: this geometry tends to fail on tile-6 and is better on tile-5.
-      if (
-        input.connectionCount === 8 &&
-        input.intersectionCount >= 17 &&
-        input.graphWidthMm <= 15 &&
-        input.graphHeightMm >= 20
-      ) {
-        return "via-tile-5-regions"
-      }
-      return "via-tile-6-regions"
-    }
-    return "via-tile-3-regions"
-  }
-
-  if (input.graphHeightMm <= 12.600000000000001) {
-    return "via-tile-3-regions"
-  }
-  if (input.graphWidthMm <= 13.41) {
+  // Decision tree fitted from benchmark-results/via-tile-solve-matrix-dataset02.json
+  // to maximize solve rate across the four static via tiles.
+  if (input.graphWidthMm > 22) {
     return "via-tile-4-regions"
   }
-  return "via-tile-5-regions"
+
+  if (input.intersectionCount <= 20) {
+    if (input.intersectionCount <= 17) {
+      return "via-tile-5-regions"
+    }
+    return input.graphWidthMm <= 12.6
+      ? "via-tile-3-regions"
+      : "via-tile-4-regions"
+  }
+
+  return area <= 246.01 ? "via-tile-3-regions" : "via-tile-5-regions"
 }
 
 const getViaTileBounds = (viaTile: ViaTile) => {
@@ -243,7 +235,7 @@ const scoreViaTileForProblem = (
   const capacityScore =
     viaCount * 3.1 +
     routeSegmentCount * 2.4 +
-    netCount * 4.0 +
+    netCount * 0.5 +
     (1 / tileArea) * 4.5
 
   const predictedReliability = clamp(
@@ -399,23 +391,20 @@ export const recommendViaTileFromGraphInput = (
     })
 
   const predictedViaRegionName =
-    predictViaRegionFromGraphPattern(normalizedInput)
-  if (predictedViaRegionName) {
-    const predictedCandidate = scored.find(
-      (candidate) => candidate.viaRegionName === predictedViaRegionName,
-    )
-    if (predictedCandidate) {
-      const reordered = [
+    predictViaRegionFromSolveMatrix(normalizedInput)
+  const predictedCandidate = scored.find(
+    (candidate) => candidate.viaRegionName === predictedViaRegionName,
+  )
+  if (predictedCandidate) {
+    return {
+      recommendedViaRegionName: predictedCandidate.viaRegionName,
+      inputFeatures: normalizedInput,
+      candidates: [
         predictedCandidate,
         ...scored.filter(
           (candidate) => candidate.viaRegionName !== predictedViaRegionName,
         ),
-      ]
-      return {
-        recommendedViaRegionName: reordered[0].viaRegionName,
-        inputFeatures: normalizedInput,
-        candidates: reordered,
-      }
+      ],
     }
   }
 
