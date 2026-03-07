@@ -4,7 +4,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { getSvgFromGraphicsObject } from "graphics-debug"
-import type { JRegion } from "../lib/JumperGraphSolver/jumper-types"
+import type { JPort, JRegion } from "../lib/JumperGraphSolver/jumper-types"
 import { visualizeJumperGraph } from "../lib/JumperGraphSolver/visualizeJumperGraph"
 import type { ViaTile } from "../lib/ViaGraphSolver/ViaGraphSolver"
 import { generateConvexViaTopologyRegions } from "../lib/ViaGraphSolver/via-graph-generator/generateConvexViaTopologyRegions"
@@ -40,8 +40,16 @@ type BakedViaTileRegion = {
   netName?: string
 }
 
+type BakedViaTilePort = {
+  portId: string
+  region1Id: string
+  region2Id: string
+  position: Point
+}
+
 type BakedViaTile = ViaTile & {
   regions: BakedViaTileRegion[]
+  ports: BakedViaTilePort[]
 }
 
 const parseViaNetName = (regionId: string): string | undefined => {
@@ -65,6 +73,99 @@ const serializeRegion = (region: JRegion): BakedViaTileRegion => ({
   netName: parseViaNetName(region.regionId),
 })
 
+const serializePort = (port: JPort): BakedViaTilePort => ({
+  portId: port.portId,
+  region1Id: port.region1.regionId,
+  region2Id: port.region2.regionId,
+  position: { x: port.d.x, y: port.d.y },
+})
+
+type BakedPortStats = {
+  total: number
+  convexToConvex: number
+  viaToConvex: number
+  viaToVia: number
+  unknown: number
+}
+
+function getBakedPortStats(bakedViaTile: BakedViaTile): BakedPortStats {
+  const regionById = new Map(
+    bakedViaTile.regions.map((region) => [region.regionId, region]),
+  )
+
+  const stats: BakedPortStats = {
+    total: bakedViaTile.ports.length,
+    convexToConvex: 0,
+    viaToConvex: 0,
+    viaToVia: 0,
+    unknown: 0,
+  }
+
+  for (const port of bakedViaTile.ports) {
+    const region1 = regionById.get(port.region1Id)
+    const region2 = regionById.get(port.region2Id)
+    if (!region1 || !region2) {
+      stats.unknown += 1
+      continue
+    }
+
+    if (region1.isViaRegion && region2.isViaRegion) {
+      stats.viaToVia += 1
+    } else if (region1.isViaRegion || region2.isViaRegion) {
+      stats.viaToConvex += 1
+    } else {
+      stats.convexToConvex += 1
+    }
+  }
+
+  return stats
+}
+
+function buildHydratedGraphFromBakedViaTile(bakedViaTile: BakedViaTile): {
+  regions: JRegion[]
+  ports: JPort[]
+} {
+  const regions: JRegion[] = bakedViaTile.regions.map((region) => ({
+    regionId: region.regionId,
+    ports: [],
+    d: {
+      bounds: region.bounds,
+      center: region.center,
+      polygon: region.polygon,
+      isPad: false,
+      isViaRegion: region.isViaRegion,
+    },
+  }))
+
+  const regionById = new Map(regions.map((region) => [region.regionId, region]))
+  const ports: JPort[] = []
+
+  for (const bakedPort of bakedViaTile.ports) {
+    const region1 = regionById.get(bakedPort.region1Id)
+    const region2 = regionById.get(bakedPort.region2Id)
+    if (!region1 || !region2) {
+      throw new Error(
+        `Baked port ${bakedPort.portId} references missing regions (${bakedPort.region1Id}, ${bakedPort.region2Id}).`,
+      )
+    }
+
+    const port: JPort = {
+      portId: bakedPort.portId,
+      region1,
+      region2,
+      d: {
+        x: bakedPort.position.x,
+        y: bakedPort.position.y,
+      },
+    }
+    region1.ports.push(port)
+    region2.ports.push(port)
+    ports.push(port)
+  }
+
+  return { regions, ports }
+}
+
 function bakeViaTile(
   viaTile: ViaTile,
   opts?: {
@@ -74,7 +175,11 @@ function bakeViaTile(
     clearance?: number
     concavityTolerance?: number
   },
-): BakedViaTile {
+): {
+  bakedViaTile: BakedViaTile
+  totalGeneratedPortCount: number
+  droppedPortCount: number
+} {
   const tileWidth = opts?.tileWidth ?? viaTile.tileWidth
   const tileHeight = opts?.tileHeight ?? viaTile.tileHeight
 
@@ -104,12 +209,27 @@ function bakeViaTile(
   const insideRegions = singleTile.regions.filter(
     (region) => !region.regionId.startsWith("filler:"),
   )
+  const insideRegionIds = new Set(
+    insideRegions.map((region) => region.regionId),
+  )
+  const insidePorts = singleTile.ports.filter(
+    (port) =>
+      insideRegionIds.has(port.region1.regionId) &&
+      insideRegionIds.has(port.region2.regionId),
+  )
 
-  return {
+  const bakedViaTile: BakedViaTile = {
     ...viaTile,
     tileWidth,
     tileHeight,
     regions: insideRegions.map(serializeRegion),
+    ports: insidePorts.map(serializePort),
+  }
+
+  return {
+    bakedViaTile,
+    totalGeneratedPortCount: singleTile.ports.length,
+    droppedPortCount: singleTile.ports.length - insidePorts.length,
   }
 }
 
@@ -122,33 +242,12 @@ function buildBakedViaTileSvg(bakedViaTile: BakedViaTile): string {
     )
   }
 
-  const singleTileBounds = {
-    minX: -tileWidth / 2,
-    maxX: tileWidth / 2,
-    minY: -tileHeight / 2,
-    maxY: tileHeight / 2,
-  }
-
-  const singleTile = generateConvexViaTopologyRegions({
-    viaTile: bakedViaTile,
-    bounds: singleTileBounds,
-    tileWidth,
-    tileHeight,
-  })
-  const regions = singleTile.regions.filter(
-    (region) => !region.regionId.startsWith("filler:"),
-  )
-  const insideRegionIds = new Set(regions.map((region) => region.regionId))
-  const ports = singleTile.ports.filter(
-    (port) =>
-      insideRegionIds.has(port.region1.regionId) &&
-      insideRegionIds.has(port.region2.regionId),
-  )
+  const { regions, ports } = buildHydratedGraphFromBakedViaTile(bakedViaTile)
 
   const graphics = visualizeJumperGraph(
     { regions, ports },
     {
-      hideRegionPortLines: true,
+      hideRegionPortLines: false,
       hideConnectionLines: true,
       hidePortPoints: false,
     },
@@ -163,13 +262,13 @@ function buildBakedViaTileSvg(bakedViaTile: BakedViaTile): string {
   const netColorMap = new Map<string, string>()
   let netColorIndex = 0
   let polyIndex = 0
-  for (const region of regions) {
-    const hasPolygon = region.d.polygon && region.d.polygon.length >= 3
+  for (const bakedRegion of bakedViaTile.regions) {
+    const hasPolygon = bakedRegion.polygon.length >= 3
     if (!hasPolygon) continue
 
-    const suffix = region.regionId.split(":").pop() ?? ""
+    const suffix = bakedRegion.regionId.split(":").pop() ?? ""
     const isOuter = outerIds.has(suffix)
-    if (!isOuter && !region.d.isConnectionRegion) {
+    if (!isOuter) {
       if (!netColorMap.has(suffix)) {
         netColorMap.set(
           suffix,
@@ -245,7 +344,8 @@ async function main() {
   for (const inputPath of inputPaths) {
     const fileContent = await fs.readFile(inputPath, "utf8")
     const viaTile: ViaTile = JSON.parse(fileContent)
-    const bakedViaTile = bakeViaTile(viaTile)
+    const { bakedViaTile, totalGeneratedPortCount, droppedPortCount } =
+      bakeViaTile(viaTile)
     const { bakedJsonPath, bakedSvgPath } = outputPathsForInput(inputPath)
 
     await writeBakedOutputs(bakedViaTile, bakedJsonPath, bakedSvgPath)
@@ -255,9 +355,23 @@ async function main() {
       (r) => r.isViaRegion,
     ).length
     const convexRegionCount = regionCount - viaRegionCount
+    const portStats = getBakedPortStats(bakedViaTile)
+    const regionsWithPorts = bakedViaTile.regions.filter((region) =>
+      bakedViaTile.ports.some(
+        (port) =>
+          port.region1Id === region.regionId ||
+          port.region2Id === region.regionId,
+      ),
+    ).length
 
     console.log(
       `Baked ${path.basename(inputPath)} -> ${path.basename(bakedJsonPath)} (${regionCount} regions: ${convexRegionCount} convex + ${viaRegionCount} via)`,
+    )
+    console.log(
+      `Ports: ${portStats.total} total (convex<->convex=${portStats.convexToConvex}, via<->convex=${portStats.viaToConvex}, via<->via=${portStats.viaToVia}${portStats.unknown > 0 ? `, unknown=${portStats.unknown}` : ""})`,
+    )
+    console.log(
+      `Port coverage: generated=${totalGeneratedPortCount}, baked=${bakedViaTile.ports.length}, dropped=${droppedPortCount}, regionsWithPorts=${regionsWithPorts}/${regionCount}`,
     )
     console.log(`SVG: ${bakedSvgPath}`)
   }

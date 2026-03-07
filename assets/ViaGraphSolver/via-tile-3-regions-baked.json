@@ -723,5 +723,142 @@
       },
       "isViaRegion": false
     }
+  ],
+  "ports": [
+    {
+      "portId": "t0_0:convex:1-2:0",
+      "region1Id": "t0_0:convex:1",
+      "region2Id": "t0_0:convex:2",
+      "position": {
+        "x": -0.19423520965698216,
+        "y": -0.6699007499999999
+      }
+    },
+    {
+      "portId": "t0_0:convex:2-3:1",
+      "region1Id": "t0_0:convex:2",
+      "region2Id": "t0_0:convex:3",
+      "position": {
+        "x": 0.2645865,
+        "y": -0.6698997499999999
+      }
+    },
+    {
+      "portId": "t0_0:convex:3-4:2",
+      "region1Id": "t0_0:convex:3",
+      "region2Id": "t0_0:convex:4",
+      "position": {
+        "x": 0.7290872499999999,
+        "y": -0.7399844499999999
+      }
+    },
+    {
+      "portId": "t0_0:convex:3-5:3",
+      "region1Id": "t0_0:convex:3",
+      "region2Id": "t0_0:convex:5",
+      "position": {
+        "x": 0.6704812499999999,
+        "y": -0.15134354999999994
+      }
+    },
+    {
+      "portId": "t0_0:convex:10-11:4",
+      "region1Id": "t0_0:convex:10",
+      "region2Id": "t0_0:convex:11",
+      "position": {
+        "x": -0.72843225,
+        "y": 0.23294054999999997
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net1:top:5",
+      "region1Id": "t0_0:v:net1",
+      "region2Id": "t0_0:convex:9",
+      "position": {
+        "x": -0.396773,
+        "y": 0.20144
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net1:bottom:6",
+      "region1Id": "t0_0:v:net1",
+      "region2Id": "t0_0:convex:2",
+      "position": {
+        "x": -0.04485999999999999,
+        "y": -0.41759599999999997
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net1:left:7",
+      "region1Id": "t0_0:v:net1",
+      "region2Id": "t0_0:convex:11",
+      "position": {
+        "x": -0.546773,
+        "y": 0.05144000000000001
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net1:right:8",
+      "region1Id": "t0_0:v:net1",
+      "region2Id": "t0_0:convex:3",
+      "position": {
+        "x": 0.10514,
+        "y": -0.267596
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net2:bottom:9",
+      "region1Id": "t0_0:v:net2",
+      "region2Id": "t0_0:convex:0",
+      "position": {
+        "x": -0.563329,
+        "y": -0.570006
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net2:right:10",
+      "region1Id": "t0_0:v:net2",
+      "region2Id": "t0_0:convex:6",
+      "position": {
+        "x": 0.54936,
+        "y": 0.600815
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net3:top:11",
+      "region1Id": "t0_0:v:net3",
+      "region2Id": "t0_0:convex:8",
+      "position": {
+        "x": -0.07075600000000001,
+        "y": 0.580539
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net3:bottom:12",
+      "region1Id": "t0_0:v:net3",
+      "region2Id": "t0_0:convex:3",
+      "position": {
+        "x": 0.280866,
+        "y": -0.03824799999999999
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net3:left:13",
+      "region1Id": "t0_0:v:net3",
+      "region2Id": "t0_0:convex:9",
+      "position": {
+        "x": -0.220756,
+        "y": 0.430539
+      }
+    },
+    {
+      "portId": "via-side:t0_0:v:net3:right:14",
+      "region1Id": "t0_0:v:net3",
+      "region2Id": "t0_0:convex:5",
+      "position": {
+        "x": 0.43086599999999997,
+        "y": 0.11175199999999999
+      }
+    }
   ]
 }

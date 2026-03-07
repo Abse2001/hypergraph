@@ -40,6 +40,13 @@ interface UnitTileTemplate {
     bounds: Bounds
     center: Point
   }>
+  /** Internal (within-tile) ports from baked templates when available */
+  internalPorts: Array<{
+    templatePortId: string
+    templateRegion1Id: string
+    templateRegion2Id: string
+    position: Point
+  }>
   /** Tile dimensions */
   tileWidth: number
   tileHeight: number
@@ -54,8 +61,16 @@ type BakedViaTileRegion = {
   netName?: string
 }
 
+type BakedViaTilePort = {
+  portId: string
+  region1Id: string
+  region2Id: string
+  position: Point
+}
+
 type BakedViaTile = ViaTile & {
   regions: BakedViaTileRegion[]
+  ports?: BakedViaTilePort[]
 }
 
 type HorizontalSegment = { xStart: number; xEnd: number; y: number }
@@ -251,6 +266,12 @@ function isBakedViaTile(viaTile: ViaTile): viaTile is BakedViaTile {
     "regions" in viaTile &&
     Array.isArray((viaTile as { regions?: unknown }).regions)
   )
+}
+
+function hasBakedViaTilePorts(
+  viaTile: BakedViaTile,
+): viaTile is BakedViaTile & { ports: BakedViaTilePort[] } {
+  return Array.isArray((viaTile as { ports?: unknown }).ports)
 }
 
 function extractViaNetNameFromRegionId(regionId: string): string | null {
@@ -532,6 +553,7 @@ function computeUnitTileTemplate(
   return {
     viaRegions,
     convexRegions,
+    internalPorts: [],
     tileWidth,
     tileHeight,
   }
@@ -544,6 +566,9 @@ function computeUnitTileTemplateFromBakedViaTile(
 ): UnitTileTemplate {
   const insideRegions = viaTile.regions.filter(
     (region) => region.polygon.length >= 3,
+  )
+  const insideRegionById = new Map(
+    insideRegions.map((region) => [region.regionId, region]),
   )
 
   const viaRegions = insideRegions
@@ -568,9 +593,38 @@ function computeUnitTileTemplateFromBakedViaTile(
       center: region.center,
     }))
 
+  let internalPorts: UnitTileTemplate["internalPorts"] = []
+  if (hasBakedViaTilePorts(viaTile)) {
+    const bakedInternalPorts: UnitTileTemplate["internalPorts"] = []
+    for (const port of viaTile.ports) {
+      const region1 = insideRegionById.get(port.region1Id)
+      const region2 = insideRegionById.get(port.region2Id)
+      if (!region1 || !region2) {
+        throw new Error(
+          `Baked via tile port ${port.portId} references missing regions (${port.region1Id}, ${port.region2Id}).`,
+        )
+      }
+
+      // Keep convex<->convex ports from baked data. Via-side ports are kept on
+      // runtime generation path for solver reliability.
+      if (region1.isViaRegion || region2.isViaRegion) {
+        continue
+      }
+
+      bakedInternalPorts.push({
+        templatePortId: port.portId,
+        templateRegion1Id: port.region1Id,
+        templateRegion2Id: port.region2Id,
+        position: port.position,
+      })
+    }
+    internalPorts = bakedInternalPorts
+  }
+
   return {
     viaRegions,
     convexRegions,
+    internalPorts,
     tileWidth,
     tileHeight,
   }
@@ -688,6 +742,9 @@ export function generateConvexViaTopologyRegions(opts: {
           concavityTolerance,
         )
   }
+  const useBakedInternalPorts = Boolean(
+    unitTileTemplate && unitTileTemplate.internalPorts.length > 0,
+  )
 
   // Step 2: Replicate tiles across the grid
   if (rows > 0 && cols > 0 && unitTileTemplate) {
@@ -696,6 +753,7 @@ export function generateConvexViaTopologyRegions(opts: {
         const tileCenterX = gridMinX + col * tileWidth + halfWidth
         const tileCenterY = gridMinY + row * tileHeight + halfHeight
         const prefix = `t${row}_${col}`
+        const tileRegionByTemplateId = new Map<string, JRegion>()
 
         // Create via regions for this tile (translated from template)
         for (const templateViaRegion of unitTileTemplate.viaRegions) {
@@ -716,6 +774,10 @@ export function generateConvexViaTopologyRegions(opts: {
           )
           viaRegions.push(viaRegion)
           allRegions.push(viaRegion)
+          tileRegionByTemplateId.set(
+            templateViaRegion.templateRegionId,
+            viaRegion,
+          )
         }
 
         // Create convex regions for this tile (translated from template)
@@ -736,6 +798,36 @@ export function generateConvexViaTopologyRegions(opts: {
           )
           convexRegions.push(convexRegion)
           allRegions.push(convexRegion)
+          tileRegionByTemplateId.set(
+            templateConvexRegion.templateRegionId,
+            convexRegion,
+          )
+        }
+
+        // Create tile-internal ports directly from baked template ports
+        if (useBakedInternalPorts) {
+          for (const templatePort of unitTileTemplate.internalPorts) {
+            const region1 = tileRegionByTemplateId.get(
+              templatePort.templateRegion1Id,
+            )
+            const region2 = tileRegionByTemplateId.get(
+              templatePort.templateRegion2Id,
+            )
+            if (!region1 || !region2) {
+              throw new Error(
+                `Missing region for baked port template ${templatePort.templatePortId} in tile ${prefix}.`,
+              )
+            }
+            createPort(
+              `${prefix}:baked:${templatePort.templatePortId}:${portIdCounter++}`,
+              region1,
+              region2,
+              {
+                x: templatePort.position.x + tileCenterX,
+                y: templatePort.position.y + tileCenterY,
+              },
+            )
+          }
         }
 
         // Add vias to output viaTile
@@ -912,9 +1004,9 @@ export function generateConvexViaTopologyRegions(opts: {
     }
   }
 
-  // Step 4: Create ports between convex regions within each tile
-  // Runtime shared-edge port generation is always used for solver reliability.
-  if (unitTileTemplate && rows > 0 && cols > 0) {
+  // Step 4: Fallback runtime generation for convex<->convex tile-internal ports.
+  // When baked internal ports are available, they are created in Step 2.
+  if (unitTileTemplate && rows > 0 && cols > 0 && !useBakedInternalPorts) {
     const regionsPerTile = unitTileTemplate.convexRegions.length
 
     for (let row = 0; row < rows; row++) {
@@ -1323,7 +1415,11 @@ export function generateConvexViaTopologyRegions(opts: {
     }
   }
 
-  // Step 8: Create ports between via regions and adjacent regions (convex or filler)
+  // Step 8: Via-side ports (legacy runtime generation path).
+  // Keep this enabled even with baked convex<->convex ports to preserve
+  // established solver behavior for via-side connectivity.
+  //
+  // Create ports between via regions and adjacent regions (convex or filler)
   // Each via region gets exactly 1 port on each side (top, bottom, left, right)
   // at the midpoint of the segment that defines that side's extreme
   // Search all non-via regions (convex + filler) for adjacency
