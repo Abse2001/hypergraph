@@ -92,6 +92,10 @@ export type SerializedRegionPortAssignment = {
 export type SerializedHyperGraph = {
   ports: SerializedGraphPort[]
   regions: SerializedGraphRegion[]
+  solvedRoutes?: SerializedSolvedRoute[]
+  connections?: SerializedConnection[]
+  _sectionRouteBindings?: SerializedSectionRouteBinding[]
+  _sectionCentralRegionId?: RegionId
 }
 
 export type SerializedCandidate = {
@@ -112,8 +116,10 @@ export type SerializedSolvedRoute = {
   requiredRip: boolean
 }
 
-export type SerializedHyperGraphWithSolvedRoutes = SerializedHyperGraph & {
-  solvedRoutes: SerializedSolvedRoute[]
+export type SerializedSectionRouteBinding = {
+  connectionId: ConnectionId
+  solvedPathStartIndex: number
+  solvedPathEndIndex: number
 }
 
 export type Connection = {

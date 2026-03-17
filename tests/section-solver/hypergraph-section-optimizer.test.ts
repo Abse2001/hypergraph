@@ -52,9 +52,12 @@ test("score should be lower", {
   })
 
   pipeline.solve()
+
   expect(pipeline.solved).toBe(true)
+  expect(pipeline.failed).toBe(false)
 
   const optimizedRoutes = pipeline.getOutput()!
+  expect(optimizedRoutes).not.toBeNull()
   const optimizedSolver = new JumperGraphSolver({
     inputGraph: {
       regions: graphWithConnections.regions,

@@ -85,17 +85,40 @@ export const getSectionOfHyperGraphAsHyperGraph = (input: {
 
   const sectionRoutes: SectionRoute[] = []
   const sectionConnections: Connection[] = []
+  const sectionRouteSegments: Array<{
+    solvedRoute: SolvedRoute
+    solvedPathStartIndex: number
+    solvedPathEndIndex: number
+    startCandidate: SolvedRoute["path"][number]
+    endCandidate: SolvedRoute["path"][number]
+  }> = []
+
+  for (const solvedRoute of solvedRoutes) {
+    const routePathSegment = getRouteSectionSpan(solvedRoute, sectionRegionIds)
+    if (!routePathSegment) continue
+
+    const startCandidate = solvedRoute.path[routePathSegment.startIndex]
+    const endCandidate = solvedRoute.path[routePathSegment.endIndex]
+    sectionRouteSegments.push({
+      solvedRoute,
+      solvedPathStartIndex: routePathSegment.startIndex,
+      solvedPathEndIndex: routePathSegment.endIndex,
+      startCandidate,
+      endCandidate,
+    })
+  }
+
   const sectionRegionMap = new Map(
     sectionGraph.regions.map((region) => [region.regionId, region]),
   )
 
-  for (const solvedRoute of solvedRoutes) {
-    const span = getRouteSectionSpan(solvedRoute, sectionRegionIds)
-    if (!span) continue
-
-    const startCandidate = solvedRoute.path[span.startIndex]
-    const endCandidate = solvedRoute.path[span.endIndex]
-
+  for (const {
+    solvedRoute,
+    solvedPathStartIndex,
+    solvedPathEndIndex,
+    startCandidate,
+    endCandidate,
+  } of sectionRouteSegments) {
     let startRegionId: string
     let startRegion: Region
     if (sectionRegionIds.has(solvedRoute.connection.startRegion.regionId)) {
@@ -178,13 +201,16 @@ export const getSectionOfHyperGraphAsHyperGraph = (input: {
       startRegion,
       endRegion,
     }
-    const rawPath = solvedRoute.path.slice(span.startIndex, span.endIndex + 1)
+    const rawPath = solvedRoute.path.slice(
+      solvedPathStartIndex,
+      solvedPathEndIndex + 1,
+    )
     const sectionRouteBase = {
       globalRoute: solvedRoute,
       globalConnection: solvedRoute.connection,
       sectionConnection,
-      sectionStartIndex: span.startIndex,
-      sectionEndIndex: span.endIndex,
+      sectionStartIndex: solvedPathStartIndex,
+      sectionEndIndex: solvedPathEndIndex,
     }
     sectionRoutes.push({
       ...sectionRouteBase,
